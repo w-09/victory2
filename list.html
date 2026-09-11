@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>缺失清單</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    background: #f2f2f2;
+    color: #333;
+    padding: 12px;
+    padding-bottom: 40px;
+  }
+  .header {
+    background: #fff;
+    padding: 14px 16px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .header h1 { font-size: 17px; font-weight: 600; }
+  .nav-link {
+    font-size: 13px;
+    color: #1a73e8;
+    text-decoration: none;
+    padding: 6px 10px;
+    background: #e8f0fe;
+    border-radius: 6px;
+  }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .stat-card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 10px 6px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .stat-num { font-size: 20px; font-weight: 700; }
+  .stat-label { font-size: 11px; color: #888; margin-top: 2px; }
+  .stat-card.overdue .stat-num { color: #e74c3c; }
+  .stat-card.pending .stat-num { color: #f39c12; }
+  .stat-card.progress .stat-num { color: #3498db; }
+  .stat-card.done .stat-num { color: #27ae60; }
+
+  .filter-bar {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .filter-btn {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    border-radius: 16px;
+    background: #fff;
+    border: 1px solid #ddd;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .filter-btn.active { background: #1a73e8; color: #fff; border-color: #1a73e8; }
+
+  .ticket-card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .ticket-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .ticket-id { font-size: 13px; font-weight: 700; color: #555; }
+  .badge { font-size: 11px; padding: 3px 8px; border-radius: 10px; color: #fff; font-weight: 600; }
+  .badge.b1 { background: #f39c12; }
+  .badge.b2 { background: #3498db; }
+  .badge.b3 { background: #27ae60; }
+  .badge.b4 { background: #7f8c8d; }
+  .badge.overdue-tag { background: #e74c3c; margin-left: 4px; }
+
+  .ticket-info { font-size: 13px; color: #666; margin-bottom: 3px; }
+  .ticket-info b { color: #333; }
+  .ticket-desc { font-size: 14px; margin: 8px 0; }
+
+  .photo-row { display: flex; gap: 8px; margin: 8px 0; }
+  .photo-thumb { width: 80px; height: 80px; border-radius: 6px; object-fit: cover; background: #eee; }
+  .photo-label { font-size: 11px; color: #999; text-align: center; margin-top: 2px; }
+
+  .expand-btn {
+    width: 100%; padding: 8px; margin-top: 6px;
+    background: #f5f5f5; border: none; border-radius: 6px;
+    font-size: 13px; color: #555; cursor: pointer;
+  }
+
+  .improve-form { display: none; margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px; }
+  .improve-form.show { display: block; }
+  .improve-form label { display: block; font-size: 12px; color: #666; margin-bottom: 4px; margin-top: 8px; }
+  .improve-form select, .improve-form textarea {
+    width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px;
+    font-size: 14px; font-family: inherit;
+  }
+  .improve-form textarea { min-height: 60px; }
+  .photo-upload-mini {
+    border: 2px dashed #ccc; border-radius: 6px; padding: 10px;
+    text-align: center; font-size: 12px; color: #888; cursor: pointer; margin-top: 4px;
+  }
+  .photo-upload-mini img { width: 100%; max-height: 150px; object-fit: cover; border-radius: 6px; }
+  .btn-update {
+    width: 100%; padding: 10px; margin-top: 10px;
+    background: #1a73e8; color: #fff; border: none;
+    border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .empty-msg { text-align: center; color: #999; padding: 40px 0; font-size: 14px; }
+  .loading { text-align: center; padding: 30px; color: #999; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📊 缺失清單</h1>
+  <a class="nav-link" href="index.html">＋ 新增回報</a>
+</div>
+
+<div class="stats-grid" id="statsGrid">
+  <div class="stat-card pending"><div class="stat-num">-</div><div class="stat-label">待處理</div></div>
+  <div class="stat-card progress"><div class="stat-num">-</div><div class="stat-label">處理中</div></div>
+  <div class="stat-card done"><div class="stat-num">-</div><div class="stat-label">已結案</div></div>
+  <div class="stat-card overdue"><div class="stat-num">-</div><div class="stat-label">逾期</div></div>
+</div>
+
+<div class="filter-bar">
+  <button class="filter-btn active" data-status="all">全部</button>
+  <button class="filter-btn" data-status="缺失改善前">改善前</button>
+  <button class="filter-btn" data-status="缺失改善中">改善中</button>
+  <button class="filter-btn" data-status="完成">完成</button>
+  <button class="filter-btn" data-status="已結案">已結案</button>
+</div>
+
+<div id="listContainer"><div class="loading">載入中...</div></div>
+
+<script>
+  // ⚠️ 請把這裡換成你部署好的 Apps Script Web App 網址
+  const API_URL = 'YOUR_APPS_SCRIPT_WEB_APP_URL';
+
+  let currentFilter = 'all';
+  const photoDataMap = {};
+
+  function loadStats() {
+    fetch(API_URL + '?action=getDashboardStats')
+      .then(res => res.json())
+      .then(stats => {
+        const grid = document.getElementById('statsGrid');
+        grid.children[0].querySelector('.stat-num').textContent = stats.pending;
+        grid.children[1].querySelector('.stat-num').textContent = stats.inProgress;
+        grid.children[2].querySelector('.stat-num').textContent = stats.closed;
+        grid.children[3].querySelector('.stat-num').textContent = stats.overdue;
+      })
+      .catch(err => console.error('載入統計失敗', err));
+  }
+
+  function statusBadgeClass(status) {
+    if (status === '缺失改善前') return 'b1';
+    if (status === '缺失改善中') return 'b2';
+    if (status === '完成') return 'b3';
+    return 'b4';
+  }
+
+  function loadList(status) {
+    document.getElementById('listContainer').innerHTML = '<div class="loading">載入中...</div>';
+    fetch(API_URL + '?action=getDefectList&status=' + encodeURIComponent(status))
+      .then(res => res.json())
+      .then(list => renderList(list))
+      .catch(err => {
+        document.getElementById('listContainer').innerHTML = '<div class="empty-msg">載入失敗：' + err.message + '</div>';
+      });
+  }
+
+  function renderList(list) {
+    const container = document.getElementById('listContainer');
+    if (list.length === 0) {
+      container.innerHTML = '<div class="empty-msg">目前沒有符合條件的缺失單</div>';
+      return;
+    }
+
+    let html = '';
+    list.forEach(item => {
+      const badgeClass = statusBadgeClass(item.status);
+      const overdueTag = item.isOverdue ? '<span class="badge overdue-tag">逾期</span>' : '';
+
+      html += '<div class="ticket-card">';
+      html += '  <div class="ticket-top">';
+      html += '    <span class="ticket-id">' + item.ticketId + '</span>';
+      html += '    <span><span class="badge ' + badgeClass + '">' + item.status + '</span>' + overdueTag + '</span>';
+      html += '  </div>';
+      html += '  <div class="ticket-info">📍 <b>' + item.location + '</b> | 🏷️ ' + item.category + '</div>';
+      html += '  <div class="ticket-info">👤 ' + item.reporterName + ' | 🕐 ' + item.reportTime + '</div>';
+      html += '  <div class="ticket-desc">' + item.description + '</div>';
+
+      html += '  <div class="photo-row">';
+      if (item.photoBefore) {
+        html += '<div><img class="photo-thumb" src="' + item.photoBefore + '" onclick="window.open(this.src)"><div class="photo-label">改善前</div></div>';
+      }
+      if (item.photoAfter) {
+        html += '<div><img class="photo-thumb" src="' + item.photoAfter + '" onclick="window.open(this.src)"><div class="photo-label">改善後</div></div>';
+      }
+      html += '  </div>';
+
+      if (item.improveDesc) {
+        html += '<div class="ticket-info">✅ 改善說明：' + item.improveDesc + '</div>';
+      }
+
+      if (item.status !== '已結案') {
+        html += '  <button class="expand-btn" onclick="toggleForm(' + item.rowIndex + ')">✏️ 更新處理狀態</button>';
+        html += '  <div class="improve-form" id="form-' + item.rowIndex + '">';
+        html += '    <label>狀態</label>';
+        html += '    <select id="status-' + item.rowIndex + '">';
+        html += '      <option value="缺失改善前"' + (item.status === '缺失改善前' ? ' selected' : '') + '>缺失改善前</option>';
+        html += '      <option value="缺失改善中"' + (item.status === '缺失改善中' ? ' selected' : '') + '>缺失改善中</option>';
+        html += '      <option value="完成"' + (item.status === '完成' ? ' selected' : '') + '>完成</option>';
+        html += '      <option value="已結案"' + (item.status === '已結案' ? ' selected' : '') + '>已結案</option>';
+        html += '    </select>';
+        html += '    <label>改善說明</label>';
+        html += '    <textarea id="desc-' + item.rowIndex + '" placeholder="請輸入改善內容...">' + (item.improveDesc || '') + '</textarea>';
+        html += '    <label>改善後照片</label>';
+        html += '    <div class="photo-upload-mini" id="photobox-' + item.rowIndex + '" onclick="document.getElementById(\'fileinput-' + item.rowIndex + '\').click()">點擊拍照或上傳</div>';
+        html += '    <input type="file" id="fileinput-' + item.rowIndex + '" accept="image/*" capture="environment" style="display:none" onchange="handlePhotoSelect(event, ' + item.rowIndex + ')">';
+        html += '    <button class="btn-update" onclick="submitUpdate(' + item.rowIndex + ')">儲存更新</button>';
+        html += '  </div>';
+      }
+
+      html += '</div>';
+    });
+
+    container.innerHTML = html;
+  }
+
+  function toggleForm(rowIndex) {
+    document.getElementById('form-' + rowIndex).classList.toggle('show');
+  }
+
+  function handlePhotoSelect(e, rowIndex) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        const maxWidth = 1000;
+        let width = img.width, height = img.height;
+        if (width > maxWidth) {
+          height = height * (maxWidth / width);
+          width = maxWidth;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        const base64 = canvas.toDataURL('image/jpeg', 0.7);
+        photoDataMap[rowIndex] = base64;
+
+        const box = document.getElementById('photobox-' + rowIndex);
+        box.innerHTML = '<img src="' + base64 + '">';
+      };
+      img.src = evt.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function submitUpdate(rowIndex) {
+    const status = document.getElementById('status-' + rowIndex).value;
+    const desc = document.getElementById('desc-' + rowIndex).value;
+    const photoAfter = photoDataMap[rowIndex] || '';
+
+    const payload = {
+      action: 'updateImprovement',
+      rowIndex: rowIndex,
+      data: { status: status, improveDesc: desc, photoAfter: photoAfter }
+    };
+
+    fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(result => {
+      if (result.success) {
+        alert('更新成功！');
+        loadList(currentFilter);
+        loadStats();
+      } else {
+        alert('更新失敗：' + result.error);
+      }
+    })
+    .catch(err => alert('更新失敗：' + err.message));
+  }
+
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      currentFilter = this.dataset.status;
+      loadList(currentFilter);
+    });
+  });
+
+  loadStats();
+  loadList('all');
+</script>
+</body>
+</html>
