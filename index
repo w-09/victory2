@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>缺失回報</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    background: #f2f2f2;
+    color: #333;
+    padding: 12px;
+    padding-bottom: 60px;
+  }
+  .header {
+    background: #fff;
+    padding: 14px 16px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .header h1 { font-size: 17px; font-weight: 600; }
+  .nav-link {
+    font-size: 13px;
+    color: #1a73e8;
+    text-decoration: none;
+    padding: 6px 10px;
+    background: #e8f0fe;
+    border-radius: 6px;
+  }
+  .card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .form-group { margin-bottom: 16px; }
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 6px;
+  }
+  select, textarea, input[type="text"] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 15px;
+    background: #fafafa;
+    font-family: inherit;
+  }
+  textarea { min-height: 80px; resize: vertical; }
+  .photo-box {
+    border: 2px dashed #ccc;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    background: #fafafa;
+    cursor: pointer;
+    position: relative;
+  }
+  .photo-box.has-photo { padding: 0; border: none; }
+  .photo-box img { width: 100%; border-radius: 8px; display: block; }
+  .photo-icon { font-size: 32px; margin-bottom: 6px; }
+  .photo-text { font-size: 13px; color: #888; }
+  input[type="file"] { display: none; }
+  .btn-submit {
+    width: 100%;
+    padding: 14px;
+    background: #1a73e8;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-submit:disabled { background: #aaa; }
+  .btn-remove {
+    position: absolute;
+    top: 6px; right: 6px;
+    background: rgba(0,0,0,0.6);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 28px; height: 28px;
+    font-size: 16px;
+    cursor: pointer;
+  }
+  .status-msg {
+    text-align: center;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    font-size: 14px;
+    display: none;
+  }
+  .status-msg.success { background: #e6f4ea; color: #1e7e34; display: block; }
+  .status-msg.error { background: #fce8e6; color: #c5221f; display: block; }
+  .required { color: #e74c3c; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📋 缺失回報</h1>
+  <a class="nav-link" href="list.html">查看清單</a>
+</div>
+
+<div id="statusMsg" class="status-msg"></div>
+
+<div class="card">
+  <form id="defectForm">
+    <div class="form-group">
+      <label>回報人姓名 <span class="required">*</span></label>
+      <input type="text" id="reporterName" placeholder="請輸入你的姓名" required>
+    </div>
+
+    <div class="form-group">
+      <label>缺失類別 <span class="required">*</span></label>
+      <select id="category" required><option value="">請選擇</option></select>
+    </div>
+
+    <div class="form-group">
+      <label>缺失位置 <span class="required">*</span></label>
+      <select id="location" required><option value="">請選擇</option></select>
+    </div>
+
+    <div class="form-group">
+      <label>缺失描述 <span class="required">*</span></label>
+      <textarea id="description" placeholder="請描述缺失內容..." required></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>缺失照片 <span class="required">*</span></label>
+      <div class="photo-box" id="photoBox" onclick="document.getElementById('photoInput').click()">
+        <div id="photoPlaceholder">
+          <div class="photo-icon">📷</div>
+          <div class="photo-text">點擊拍照或選擇照片</div>
+        </div>
+        <img id="photoPreview" style="display:none;">
+        <button type="button" class="btn-remove" id="btnRemovePhoto" style="display:none;" onclick="removePhoto(event)">✕</button>
+      </div>
+      <input type="file" id="photoInput" accept="image/*" capture="environment">
+    </div>
+
+    <button type="submit" class="btn-submit" id="submitBtn">送出回報</button>
+  </form>
+</div>
+
+<script>
+  // ⚠️ 請把這裡換成你部署好的 Apps Script Web App 網址
+  const API_URL = 'YOUR_APPS_SCRIPT_WEB_APP_URL';
+
+  let photoBase64 = '';
+
+  // 載入下拉選單選項
+  fetch(API_URL + '?action=getOptions')
+    .then(res => res.json())
+    .then(options => {
+      const catSelect = document.getElementById('category');
+      options.categories.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c; opt.textContent = c;
+        catSelect.appendChild(opt);
+      });
+      const locSelect = document.getElementById('location');
+      options.locations.forEach(l => {
+        const opt = document.createElement('option');
+        opt.value = l; opt.textContent = l;
+        locSelect.appendChild(opt);
+      });
+    })
+    .catch(err => console.error('載入選項失敗', err));
+
+  // 照片選擇處理（含壓縮）
+  document.getElementById('photoInput').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        const maxWidth = 1000;
+        let width = img.width, height = img.height;
+        if (width > maxWidth) {
+          height = height * (maxWidth / width);
+          width = maxWidth;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        photoBase64 = canvas.toDataURL('image/jpeg', 0.7);
+
+        document.getElementById('photoPreview').src = photoBase64;
+        document.getElementById('photoPreview').style.display = 'block';
+        document.getElementById('photoPlaceholder').style.display = 'none';
+        document.getElementById('btnRemovePhoto').style.display = 'block';
+        document.getElementById('photoBox').classList.add('has-photo');
+      };
+      img.src = evt.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  function removePhoto(e) {
+    e.stopPropagation();
+    photoBase64 = '';
+    document.getElementById('photoPreview').style.display = 'none';
+    document.getElementById('photoPlaceholder').style.display = 'block';
+    document.getElementById('btnRemovePhoto').style.display = 'none';
+    document.getElementById('photoBox').classList.remove('has-photo');
+    document.getElementById('photoInput').value = '';
+  }
+
+  // 表單送出
+  document.getElementById('defectForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    if (!photoBase64) {
+      showMsg('請上傳缺失照片', 'error');
+      return;
+    }
+
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = '送出中...';
+
+    const payload = {
+      action: 'submitDefect',
+      data: {
+        reporterName: document.getElementById('reporterName').value,
+        category: document.getElementById('category').value,
+        location: document.getElementById('location').value,
+        description: document.getElementById('description').value,
+        photoBefore: photoBase64
+      }
+    };
+
+    // 用 text/plain 避免瀏覽器發出 CORS 預檢請求
+    fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(result => {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '送出回報';
+      if (result.success) {
+        showMsg('✅ 回報成功！單號：' + result.ticketId, 'success');
+        document.getElementById('defectForm').reset();
+        removePhoto({ stopPropagation: function(){} });
+      } else {
+        showMsg('送出失敗：' + result.error, 'error');
+      }
+    })
+    .catch(err => {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '送出回報';
+      showMsg('送出失敗：' + err.message, 'error');
+    });
+  });
+
+  function showMsg(text, type) {
+    const msg = document.getElementById('statusMsg');
+    msg.textContent = text;
+    msg.className = 'status-msg ' + type;
+    window.scrollTo(0, 0);
+    setTimeout(() => { msg.style.display = 'none'; }, 5000);
+  }
+</script>
+</body>
+</html>
